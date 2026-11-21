@@ -1,0 +1,203 @@
+{
+  "entities": {
+    "Resident": {
+      "title": "Resident",
+      "description": "Private profile for an authenticated Tower 3 resident unit owner or administrator.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "phone": { "type": "string", "minLength": 10, "maxLength": 20, "pattern": "^[0-9+\\-\\s]+$" },
+        "unitNumber": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(ADM|049|05[0-9]|06[0-9]|07[0-2])$" },
+        "floor": { "type": "integer" },
+        "role": { "type": "string", "enum": ["resident", "representative", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email", "phone", "unitNumber", "floor", "role", "createdAt", "updatedAt"]
+    },
+    "UnitDirectory": {
+      "title": "UnitDirectory",
+      "description": "Non-PII directory entry mapping unit numbers 049 to 072 to floor and optional occupant display name.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "unitNumber": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(049|05[0-9]|06[0-9]|07[0-2])$" },
+        "floor": { "type": "integer" },
+        "occupantName": { "type": "string", "maxLength": 100 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "unitNumber", "floor", "occupantName", "updatedAt"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "Digital notice board entry including emergency work announcements.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "content": { "type": "string", "minLength": 5, "maxLength": 2000 },
+        "category": { "type": "string", "enum": ["Emergency Work", "Maintenance", "Society Meeting", "General"] },
+        "priority": { "type": "string", "enum": ["urgent", "normal"] },
+        "effectiveDate": { "type": "string", "maxLength": 40 },
+        "authorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "authorUnit": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(ADM|049|05[0-9]|06[0-9]|07[0-2])$" },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "title", "content", "category", "priority", "effectiveDate", "authorUid", "authorName", "authorUnit", "status", "createdAt", "updatedAt"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Additional society expense in the Different Expenses section shared equally across 24 units.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "category": { "type": "string", "enum": ["Common Area Repair", "Cleaning Supplies", "Security & Lighting", "Sanitation", "Miscellaneous"] },
+        "amount": { "type": "number" },
+        "perUnitShare": { "type": "number" },
+        "month": { "type": "string", "minLength": 7, "maxLength": 7, "pattern": "^[0-9]{4}-[0-9]{2}$" },
+        "description": { "type": "string", "maxLength": 600 },
+        "addedByUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "addedByName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "addedByUnit": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(ADM|049|05[0-9]|06[0-9]|07[0-2])$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "title", "category", "amount", "perUnitShare", "month", "description", "addedByUid", "addedByName", "addedByUnit", "createdAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Monthly dues payment receipt for a Tower 3 unit.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "month": { "type": "string", "minLength": 7, "maxLength": 7, "pattern": "^[0-9]{4}-[0-9]{2}$" },
+        "unitNumber": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(049|05[0-9]|06[0-9]|07[0-2])$" },
+        "residentUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "residentName": { "type": "string", "maxLength": 100 },
+        "cleanerShare": { "type": "number" },
+        "extraExpensesShare": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["UPI", "Bank Transfer", "Cash to Representative"] },
+        "referenceNumber": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "status": { "type": "string", "enum": ["paid"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "month", "unitNumber", "residentUid", "residentName", "cleanerShare", "extraExpensesShare", "totalAmount", "paymentMethod", "referenceNumber", "status", "createdAt"]
+    },
+    "MaintenanceRequest": {
+      "title": "MaintenanceRequest",
+      "description": "Building damage or common-area maintenance report filed by a resident or admin.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "location": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "category": { "type": "string", "enum": ["Plumbing & Leakage", "Electrical Fixture", "Structural & Masonry", "Lift & Staircase", "Common Area & Gate"] },
+        "urgency": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "description": { "type": "string", "minLength": 5, "maxLength": 1500 },
+        "status": { "type": "string", "enum": ["reported", "in_progress", "resolved"] },
+        "resolutionNote": { "type": "string", "maxLength": 500 },
+        "reporterUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "reporterName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "reporterUnit": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(ADM|049|05[0-9]|06[0-9]|07[0-2])$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "title", "location", "category", "urgency", "description", "status", "resolutionNote", "reporterUid", "reporterName", "reporterUnit", "createdAt", "updatedAt"]
+    },
+    "DiscussionTopic": {
+      "title": "DiscussionTopic",
+      "description": "Resident discussion thread for common issues in Tower 3.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "title": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "category": { "type": "string", "enum": ["Cleanliness", "Parking & Entry", "Building Upkeep", "Security", "General"] },
+        "body": { "type": "string", "minLength": 5, "maxLength": 2500 },
+        "authorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "authorUnit": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(ADM|049|05[0-9]|06[0-9]|07[0-2])$" },
+        "status": { "type": "string", "enum": ["open", "resolved"] },
+        "replyCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "title", "category", "body", "authorUid", "authorName", "authorUnit", "status", "replyCount", "createdAt", "updatedAt"]
+    },
+    "DiscussionReply": {
+      "title": "DiscussionReply",
+      "description": "Reply to a Tower 3 common issue discussion topic.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "topicId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "body": { "type": "string", "minLength": 2, "maxLength": 1500 },
+        "authorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "authorUnit": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(ADM|049|05[0-9]|06[0-9]|07[0-2])$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "topicId", "body", "authorUid", "authorName", "authorUnit", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit trail of resident and admin actions across bills, notices, maintenance, and discussions.",
+      "type": "object",
+      "properties": {
+        "societyId": { "type": "string", "enum": ["tower3-duliajan"] },
+        "scope": { "type": "string", "enum": ["personal", "society"] },
+        "actorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "actorUnit": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^(ADM|049|05[0-9]|06[0-9]|07[0-2])$" },
+        "actionType": { "type": "string", "enum": ["payment", "expense", "notice", "maintenance", "discussion", "account"] },
+        "summary": { "type": "string", "minLength": 3, "maxLength": 300 },
+        "targetSection": { "type": "string", "enum": ["bills", "notices", "maintenance", "discussions", "overview", "emergency"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["societyId", "scope", "actorUid", "actorName", "actorUnit", "actionType", "summary", "targetSection", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/residents/{uid}": {
+      "schema": { "$ref": "#/entities/Resident" },
+      "description": "Private PII profile for each resident owner, restricted strictly to owner or admin."
+    },
+    "/unitDirectory/{unitNumber}": {
+      "schema": { "$ref": "#/entities/UnitDirectory" },
+      "description": "Non-PII directory of Tower 3 unit occupant names (049-072), editable by Admin."
+    },
+    "/notices/{noticeId}": {
+      "schema": { "$ref": "#/entities/Notice" },
+      "description": "Society notice board entries including emergency work notices."
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Additional common society expenses split equally among 24 units."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Monthly dues payment receipts per unit."
+    },
+    "/maintenanceRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/MaintenanceRequest" },
+      "description": "Building damage and maintenance request tracker."
+    },
+    "/discussions/{topicId}": {
+      "schema": { "$ref": "#/entities/DiscussionTopic" },
+      "description": "Common issues discussion threads."
+    },
+    "/discussions/{topicId}/replies/{replyId}": {
+      "schema": { "$ref": "#/entities/DiscussionReply" },
+      "description": "Replies nested under a discussion topic."
+    },
+    "/activities/{activityId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Resident and admin activity log entries."
+    }
+  }
+}

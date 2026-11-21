@@ -1,0 +1,8 @@
+{
+  "name": "Tower 3 HD Oil Housing Society",
+  "description": "Resident portal for Tower 3, New Horizontal Enclave, Oil Housing Area, OIL India Ltd., Duliajan, Assam 786602 — bills & dues, common expenses, emergency notices, maintenance tracker, discussions, and emergency contacts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

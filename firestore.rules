@@ -1,0 +1,415 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isVerifiedUser() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'subhasish.toons@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidUnitNumber(u) {
+      return u is string && u.size() == 3 && u.matches('^(049|05[0-9]|06[0-9]|07[0-2])$');
+    }
+
+    function isValidActorUnit(u) {
+      return u is string && u.size() == 3 && u.matches('^(ADM|049|05[0-9]|06[0-9]|07[0-2])$');
+    }
+
+    function isValidMonth(m) {
+      return m is string && m.size() == 7 && m.matches('^[0-9]{4}-[0-9]{2}$');
+    }
+
+    // --- Validation Blueprints ---
+    function isValidResident(data) {
+      return data.keys().hasAll(['uid', 'fullName', 'email', 'phone', 'unitNumber', 'floor', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'fullName', 'email', 'phone', 'unitNumber', 'floor', 'role', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100
+        && data.email is string && data.email.size() >= 5 && data.email.size() <= 160
+        && data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 20 && data.phone.matches('^[0-9+\\-\\s]+$')
+        && isValidActorUnit(data.unitNumber)
+        && data.floor is int && data.floor >= 0 && data.floor <= 6
+        && data.role is string && data.role in ['resident', 'representative', 'admin']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUnitDirectory(data, unitId) {
+      return data.keys().hasAll(['societyId', 'unitNumber', 'floor', 'occupantName', 'updatedAt'])
+        && data.keys().hasOnly(['societyId', 'unitNumber', 'floor', 'occupantName', 'updatedAt'])
+        && data.societyId == 'tower3-duliajan'
+        && isValidUnitNumber(data.unitNumber)
+        && data.unitNumber == unitId
+        && data.floor is int && data.floor >= 1 && data.floor <= 6
+        && data.occupantName is string && data.occupantName.size() <= 100
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNotice(data) {
+      return data.keys().hasAll(['societyId', 'title', 'content', 'category', 'priority', 'effectiveDate', 'authorUid', 'authorName', 'authorUnit', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['societyId', 'title', 'content', 'category', 'priority', 'effectiveDate', 'authorUid', 'authorName', 'authorUnit', 'status', 'createdAt', 'updatedAt'])
+        && data.societyId == 'tower3-duliajan'
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 140
+        && data.content is string && data.content.size() >= 5 && data.content.size() <= 2000
+        && data.category is string && data.category in ['Emergency Work', 'Maintenance', 'Society Meeting', 'General']
+        && data.priority is string && data.priority in ['urgent', 'normal']
+        && data.effectiveDate is string && data.effectiveDate.size() >= 1 && data.effectiveDate.size() <= 40
+        && isValidId(data.authorUid)
+        && data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 100
+        && isValidActorUnit(data.authorUnit)
+        && data.status is string && data.status in ['active', 'archived']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['societyId', 'title', 'category', 'amount', 'perUnitShare', 'month', 'description', 'addedByUid', 'addedByName', 'addedByUnit', 'createdAt'])
+        && data.keys().hasOnly(['societyId', 'title', 'category', 'amount', 'perUnitShare', 'month', 'description', 'addedByUid', 'addedByName', 'addedByUnit', 'createdAt'])
+        && data.societyId == 'tower3-duliajan'
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 120
+        && data.category is string && data.category in ['Common Area Repair', 'Cleaning Supplies', 'Security & Lighting', 'Sanitation', 'Miscellaneous']
+        && data.amount is number && data.amount > 0 && data.amount <= 500000
+        && data.perUnitShare is number && data.perUnitShare > 0 && data.perUnitShare <= 25000
+        && isValidMonth(data.month)
+        && data.description is string && data.description.size() <= 600
+        && isValidId(data.addedByUid)
+        && data.addedByName is string && data.addedByName.size() >= 2 && data.addedByName.size() <= 100
+        && isValidActorUnit(data.addedByUnit)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll(['societyId', 'month', 'unitNumber', 'residentUid', 'residentName', 'cleanerShare', 'extraExpensesShare', 'totalAmount', 'paymentMethod', 'referenceNumber', 'status', 'createdAt'])
+        && data.keys().hasOnly(['societyId', 'month', 'unitNumber', 'residentUid', 'residentName', 'cleanerShare', 'extraExpensesShare', 'totalAmount', 'paymentMethod', 'referenceNumber', 'status', 'createdAt'])
+        && data.societyId == 'tower3-duliajan'
+        && isValidMonth(data.month)
+        && isValidUnitNumber(data.unitNumber)
+        && isValidId(data.residentUid)
+        && data.residentName is string && data.residentName.size() <= 100
+        && data.cleanerShare is number && data.cleanerShare >= 0 && data.cleanerShare <= 2000
+        && data.extraExpensesShare is number && data.extraExpensesShare >= 0 && data.extraExpensesShare <= 50000
+        && data.totalAmount is number && data.totalAmount > 0 && data.totalAmount <= 52000
+        && data.paymentMethod is string && data.paymentMethod in ['UPI', 'Bank Transfer', 'Cash to Representative']
+        && data.referenceNumber is string && data.referenceNumber.size() >= 3 && data.referenceNumber.size() <= 80
+        && data.status == 'paid'
+        && data.createdAt is timestamp;
+    }
+
+    function isValidMaintenanceRequest(data) {
+      return data.keys().hasAll(['societyId', 'title', 'location', 'category', 'urgency', 'description', 'status', 'resolutionNote', 'reporterUid', 'reporterName', 'reporterUnit', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['societyId', 'title', 'location', 'category', 'urgency', 'description', 'status', 'resolutionNote', 'reporterUid', 'reporterName', 'reporterUnit', 'createdAt', 'updatedAt'])
+        && data.societyId == 'tower3-duliajan'
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 140
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 100
+        && data.category is string && data.category in ['Plumbing & Leakage', 'Electrical Fixture', 'Structural & Masonry', 'Lift & Staircase', 'Common Area & Gate']
+        && data.urgency is string && data.urgency in ['High', 'Medium', 'Low']
+        && data.description is string && data.description.size() >= 5 && data.description.size() <= 1500
+        && data.status is string && data.status in ['reported', 'in_progress', 'resolved']
+        && data.resolutionNote is string && data.resolutionNote.size() <= 500
+        && isValidId(data.reporterUid)
+        && data.reporterName is string && data.reporterName.size() >= 2 && data.reporterName.size() <= 100
+        && isValidActorUnit(data.reporterUnit)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDiscussionTopic(data) {
+      return data.keys().hasAll(['societyId', 'title', 'category', 'body', 'authorUid', 'authorName', 'authorUnit', 'status', 'replyCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['societyId', 'title', 'category', 'body', 'authorUid', 'authorName', 'authorUnit', 'status', 'replyCount', 'createdAt', 'updatedAt'])
+        && data.societyId == 'tower3-duliajan'
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 160
+        && data.category is string && data.category in ['Cleanliness', 'Parking & Entry', 'Building Upkeep', 'Security', 'General']
+        && data.body is string && data.body.size() >= 5 && data.body.size() <= 2500
+        && isValidId(data.authorUid)
+        && data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 100
+        && isValidActorUnit(data.authorUnit)
+        && data.status is string && data.status in ['open', 'resolved']
+        && data.replyCount is int && data.replyCount >= 0 && data.replyCount <= 10000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDiscussionReply(data, parentTopicId) {
+      return data.keys().hasAll(['societyId', 'topicId', 'body', 'authorUid', 'authorName', 'authorUnit', 'createdAt'])
+        && data.keys().hasOnly(['societyId', 'topicId', 'body', 'authorUid', 'authorName', 'authorUnit', 'createdAt'])
+        && data.societyId == 'tower3-duliajan'
+        && data.topicId == parentTopicId
+        && data.body is string && data.body.size() >= 2 && data.body.size() <= 1500
+        && isValidId(data.authorUid)
+        && data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 100
+        && isValidActorUnit(data.authorUnit)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['societyId', 'scope', 'actorUid', 'actorName', 'actorUnit', 'actionType', 'summary', 'targetSection', 'createdAt'])
+        && data.keys().hasOnly(['societyId', 'scope', 'actorUid', 'actorName', 'actorUnit', 'actionType', 'summary', 'targetSection', 'createdAt'])
+        && data.societyId == 'tower3-duliajan'
+        && data.scope is string && data.scope in ['personal', 'society']
+        && isValidId(data.actorUid)
+        && data.actorName is string && data.actorName.size() >= 2 && data.actorName.size() <= 100
+        && isValidActorUnit(data.actorUnit)
+        && data.actionType is string && data.actionType in ['payment', 'expense', 'notice', 'maintenance', 'discussion', 'account']
+        && data.summary is string && data.summary.size() >= 3 && data.summary.size() <= 300
+        && data.targetSection is string && data.targetSection in ['bills', 'notices', 'maintenance', 'discussions', 'overview', 'emergency']
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // Admin registry (read-only by self, never client-writable)
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && isOwner(adminUid);
+      allow list, create, update, delete: if false;
+    }
+
+    // Private resident PII profiles (Strict Owner/Admin Isolation)
+    match /residents/{uid} {
+      allow get: if isValidId(uid) && (isOwner(uid) || isAdmin());
+      allow list: if isVerifiedUser() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser()
+        && isValidId(uid)
+        && isValidResident(incoming())
+        && isOwner(uid)
+        && incoming().uid == request.auth.uid
+        && (incoming().role == 'resident' || isAdmin())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(uid)
+        && isValidResident(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(uid)
+            && incoming().role == existing().role
+            && incoming().email == existing().email
+            && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phone', 'unitNumber', 'floor', 'updatedAt'])
+          )
+        );
+      allow delete: if isAdmin() && isValidId(uid);
+    }
+
+    // Unit Directory (049-072 occupant display names — Admin-editable, no PII)
+    match /unitDirectory/{unitNumber} {
+      allow get: if isVerifiedUser() && isValidUnitNumber(unitNumber) && resource.data.societyId == 'tower3-duliajan';
+      allow list: if isVerifiedUser() && resource.data.societyId == 'tower3-duliajan';
+      allow create: if isAdmin()
+        && isValidUnitNumber(unitNumber)
+        && isValidUnitDirectory(incoming(), unitNumber)
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidUnitNumber(unitNumber)
+        && isValidUnitDirectory(incoming(), unitNumber)
+        && incoming().unitNumber == existing().unitNumber
+        && incoming().floor == existing().floor
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['occupantName', 'updatedAt']);
+      allow delete: if isAdmin() && isValidUnitNumber(unitNumber);
+    }
+
+    // Digital Notice Board
+    match /notices/{noticeId} {
+      allow get: if isVerifiedUser() && isValidId(noticeId) && resource.data.societyId == 'tower3-duliajan';
+      allow list: if isVerifiedUser() && resource.data.societyId == 'tower3-duliajan';
+      allow create: if isVerifiedUser()
+        && isValidId(noticeId)
+        && isValidNotice(incoming())
+        && incoming().authorUid == request.auth.uid
+        && incoming().status == 'active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(noticeId)
+        && isValidNotice(incoming())
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().authorUid == request.auth.uid
+            && existing().status == 'active'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'category', 'priority', 'effectiveDate', 'status', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(noticeId) && (isAdmin() || (isVerifiedUser() && existing().authorUid == request.auth.uid));
+    }
+
+    // Additional Society Expenses ("Different Expenses")
+    match /expenses/{expenseId} {
+      allow get: if isVerifiedUser() && isValidId(expenseId) && resource.data.societyId == 'tower3-duliajan';
+      allow list: if isVerifiedUser() && resource.data.societyId == 'tower3-duliajan';
+      allow create: if isVerifiedUser()
+        && isValidId(expenseId)
+        && isValidExpense(incoming())
+        && incoming().addedByUid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(expenseId)
+        && isValidExpense(incoming())
+        && incoming().addedByUid == existing().addedByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'amount', 'perUnitShare', 'month', 'description']);
+      allow delete: if isValidId(expenseId) && (isAdmin() || (isVerifiedUser() && existing().addedByUid == request.auth.uid));
+    }
+
+    // Monthly Maintenance Payments (Immutable for Residents; Admin can add/edit/delete)
+    match /payments/{paymentId} {
+      allow get: if isVerifiedUser() && isValidId(paymentId) && resource.data.societyId == 'tower3-duliajan';
+      allow list: if isVerifiedUser() && resource.data.societyId == 'tower3-duliajan';
+      allow create: if isVerifiedUser()
+        && isValidId(paymentId)
+        && isValidPayment(incoming())
+        && (incoming().residentUid == request.auth.uid || isAdmin())
+        && incoming().createdAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(paymentId)
+        && isValidPayment(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['residentName', 'cleanerShare', 'extraExpensesShare', 'totalAmount', 'paymentMethod', 'referenceNumber', 'status']);
+      allow delete: if isAdmin() && isValidId(paymentId);
+    }
+
+    // Maintenance Request Tracker (Building Damages)
+    match /maintenanceRequests/{requestId} {
+      allow get: if isVerifiedUser() && isValidId(requestId) && resource.data.societyId == 'tower3-duliajan';
+      allow list: if isVerifiedUser() && resource.data.societyId == 'tower3-duliajan';
+      allow create: if isVerifiedUser()
+        && isValidId(requestId)
+        && isValidMaintenanceRequest(incoming())
+        && incoming().reporterUid == request.auth.uid
+        && incoming().status == 'reported'
+        && incoming().resolutionNote == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(requestId)
+        && isValidMaintenanceRequest(incoming())
+        && incoming().reporterUid == existing().reporterUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().status != 'resolved'
+            && (
+              (existing().reporterUid == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'location', 'category', 'urgency', 'description', 'status', 'resolutionNote', 'updatedAt'])) ||
+              (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'resolutionNote', 'updatedAt']))
+            )
+          )
+        );
+      allow delete: if isAdmin() && isValidId(requestId);
+    }
+
+    // Common Issues Discussions
+    match /discussions/{topicId} {
+      allow get: if isVerifiedUser() && isValidId(topicId) && resource.data.societyId == 'tower3-duliajan';
+      allow list: if isVerifiedUser() && resource.data.societyId == 'tower3-duliajan';
+      allow create: if isVerifiedUser()
+        && isValidId(topicId)
+        && isValidDiscussionTopic(incoming())
+        && incoming().authorUid == request.auth.uid
+        && incoming().status == 'open'
+        && incoming().replyCount == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(topicId)
+        && isValidDiscussionTopic(incoming())
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().status == 'open'
+            && existing().authorUid == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          ) ||
+          (
+            existing().status == 'open'
+            && incoming().replyCount == existing().replyCount + 1
+            && incoming().diff(existing()).affectedKeys().hasOnly(['replyCount', 'updatedAt'])
+          )
+        );
+      allow delete: if isAdmin() && isValidId(topicId);
+
+      // Master Gate Subcollection: Replies
+      match /replies/{replyId} {
+        allow get: if isVerifiedUser()
+          && isValidId(topicId)
+          && isValidId(replyId)
+          && resource.data.societyId == 'tower3-duliajan'
+          && exists(/databases/$(database)/documents/discussions/$(topicId));
+        allow list: if isVerifiedUser() && resource.data.societyId == 'tower3-duliajan' && resource.data.topicId == topicId;
+        allow create: if isVerifiedUser()
+          && isValidId(topicId)
+          && isValidId(replyId)
+          && isValidDiscussionReply(incoming(), topicId)
+          && incoming().authorUid == request.auth.uid
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/discussions/$(topicId))
+          && get(/databases/$(database)/documents/discussions/$(topicId)).data.status == 'open';
+        allow update: if isAdmin()
+          && isValidId(topicId)
+          && isValidId(replyId)
+          && isValidDiscussionReply(incoming(), topicId)
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['body']);
+        allow delete: if isValidId(topicId) && isValidId(replyId) && (isAdmin() || (isVerifiedUser() && existing().authorUid == request.auth.uid));
+      }
+    }
+
+    // Resident Activity Log
+    match /activities/{activityId} {
+      allow get: if isVerifiedUser()
+        && isValidId(activityId)
+        && (resource.data.actorUid == request.auth.uid || resource.data.societyId == 'tower3-duliajan');
+      allow list: if isVerifiedUser()
+        && (resource.data.actorUid == request.auth.uid || (resource.data.societyId == 'tower3-duliajan' && resource.data.scope == 'society'));
+      allow create: if isVerifiedUser()
+        && isValidId(activityId)
+        && isValidActivity(incoming())
+        && incoming().actorUid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(activityId);
+    }
+  }
+}
